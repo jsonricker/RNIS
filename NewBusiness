@@ -1,0 +1,61 @@
+import requests
+from datetime import datetime
+
+def fetch_new_businesses():
+    # The official Socrata Open Data API endpoint for NYS Active Corporations
+    url = "https://data.ny.gov/resource/n9v6-gdp6.json"
+    
+    # We use Socrata Query Language (SoQL) parameters in the URL
+    querystring = {
+        # FIX: Use a $where clause to force a case-insensitive match
+        "$where": "upper(county) = 'MONROE'", 
+        "$order": "initial_dos_filing_date DESC",
+        "$limit": 25 
+    }
+
+    print("Connecting to the NYS Open Data portal...")
+    # No headers or API keys needed!
+    response = requests.get(url, params=querystring)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"❌ Error connecting to NYS server: {response.status_code}")
+        return None
+
+def display_new_businesses(data):
+    if not data:
+        print("No business data found.")
+        return
+
+    print(f"\n✅ Successfully pulled the {len(data)} newest businesses registered in Monroe County.")
+    print("\n--- NEW BUSINESS REGISTRATIONS ---")
+    print("=" * 60)
+    
+    for count, business in enumerate(data, 1):
+        # Extract the relevant fields safely
+        name = business.get('current_entity_name', 'UNKNOWN NAME').title()
+        entity_type = business.get('entity_type', 'Unknown Type')
+        city = business.get('dos_process_city', 'Unknown City').title()
+        
+        # Socrata sends dates in ISO format (e.g., 2024-10-25T00:00:00.000)
+        raw_date = business.get('initial_dos_filing_date')
+        
+        if raw_date:
+            # Clean up the date string so Python can read it easily
+            clean_date_string = raw_date.split('T')[0] 
+            date_obj = datetime.strptime(clean_date_string, "%Y-%m-%d")
+            formatted_date = date_obj.strftime("%B %d, %Y")
+        else:
+            formatted_date = "Unknown Date"
+            
+        print(f"{count}. {name}")
+        print(f"   Type: {entity_type}")
+        print(f"   City: {city}")
+        print(f"   Date: {formatted_date}")
+        print("-" * 60)
+
+# --- Execution ---
+if __name__ == "__main__":
+    raw_business_data = fetch_new_businesses()
+    display_new_businesses(raw_business_data)
