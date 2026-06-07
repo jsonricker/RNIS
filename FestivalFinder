@@ -1,0 +1,41 @@
+def get_upcoming_festivals():
+    # Since scraping is blocked, we use a static, hardcoded dictionary.
+    # This guarantees the data is always available to your master dashboard.
+    festivals_2026 = [
+        {
+            "name": "Rochester International Jazz Festival",
+            "dates": "June 19 - June 27, 2026",
+            "location": "Downtown Rochester",
+            "vendor_opportunity": "High - Massive street festival with food and merch vendors.",
+            "url": "https://www.rochesterjazz.com/"
+        },
+        {
+            "name": "Corn Hill Arts Festival",
+            "dates": "July 11 - 12, 2026",
+            "location": "Corn Hill Neighborhood",
+            "vendor_opportunity": "Very High - Hundreds of arts, crafts, and food vendors.",
+            "url": "https://cornhillartsfestival.com/"
+        },
+        {
+            "name": "Rochester Fringe Festival",
+            "dates": "September 2026 (Dates TBA)",
+            "location": "Downtown Rochester",
+            "vendor_opportunity": "Medium - Specialized vendor spots available during peak weekend events.",
+            "url": "https://rochesterfringe.com/"
+        }
+    ]
+
+    print("\n--- UPCOMING ROCHESTER VENDOR FESTIVALS (2026) ---")
+    print("=" * 65)
+    
+    for count, event in enumerate(festivals_2026, 1):
+        print(f"{count}. {event['name']}")
+        print(f"   Dates:    {event['dates']}")
+        print(f"   Location: {event['location']}")
+        print(f"   Vendors:  {event['vendor_opportunity']}")
+        print(f"   Website:  {event['url']}")
+        print("-" * 65)
+
+# --- Execution ---
+if __name__ == "__main__":
+    get_upcoming_festivals()
