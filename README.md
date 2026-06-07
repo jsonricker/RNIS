@@ -1,6 +1,4 @@
-==========================================
 ROCHESTER NEIGHBORHOOD INTELLIGENCE SUITE
-==========================================
 
 Welcome to the Rochester Neighborhood Intelligence Suite. This repository contains a powerful collection of five independent Python programs designed to gather, filter, and output critical localized data for Rochester, NY. 
 
