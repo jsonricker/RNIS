@@ -1,0 +1,198 @@
+import requests
+from datetime import datetime, timedelta
+
+# ==========================================
+# 1. REAL ESTATE TRACKER
+# ==========================================
+def fetch_sold_homes(api_key, location="Rochester, NY"):
+    url = "https://real-estate-zillow-com.p.rapidapi.com/v1/search/sold" 
+    querystring = {"location_or_rid": location, "property_types": "house", "sort": "relevant", "page": "1", "doz": "7"}
+    headers = {"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": "real-estate-zillow-com.p.rapidapi.com"}
+    
+    print("\n[System] Connecting to Zillow RapidAPI...")
+    response = requests.get(url, headers=headers, params=querystring)
+    if response.status_code == 200:
+        return response.json()
+    elif response.status_code == 403:
+        print("❌ Error 403: Forbidden. Please check your RapidAPI Key.")
+    else:
+        print(f"❌ Error: Server returned status {response.status_code}")
+    return None
+
+def display_sold_homes(data):
+    if not data: return
+    property_list = data.get('data', {}).get('listings', []) if isinstance(data, dict) else []
+    
+    if not property_list:
+        print("No recently sold homes found in the data.")
+        return
+        
+    print(f"\n--- RECENTLY SOLD HOMES ({len(property_list)}) ---")
+    print("=" * 60)
+    for count, property in enumerate(property_list, 1):
+        address = property.get('address', 'No Address Listed')
+        zpid = property.get('zpid') or property.get('id')
+        link = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else "No Link"
+        print(f"{count}. {address}\n   Link: {link}\n" + "-" * 60)
+
+# ==========================================
+# 2. PUBLIC SAFETY TRACKER
+# ==========================================
+def fetch_rochester_crime_data():
+    url = "https://maps.cityofrochester.gov/arcgis/rest/services/RPD/RPD_Part_I_Crime/FeatureServer/1/query"
+    querystring = {
+        "where": "1=1",
+        "outFields": "Statute_CrimeCategory,Geocode_Address,Reported_Timestamp", 
+        "returnGeometry": "false",
+        "orderByFields": "Reported_Timestamp DESC", 
+        "resultRecordCount": "500",                 
+        "f": "json"
+    }
+    print("\n[System] Connecting to RPD Open Data Portal...")
+    response = requests.get(url, params=querystring)
+    return response.json() if response.status_code == 200 else None
+
+def display_recent_crimes(data):
+    if not data or 'features' not in data: return
+    crimes = data['features']
+    one_week_ago = datetime.now() - timedelta(days=7)
+    recent_crimes = []
+    
+    for crime in crimes:
+        attributes = crime.get('attributes', {})
+        timestamp_ms = attributes.get('Reported_Timestamp') or attributes.get('OccurredFrom_Timestamp')
+        if timestamp_ms:
+            crime_date = datetime.fromtimestamp(timestamp_ms / 1000.0)
+            if crime_date >= one_week_ago:
+                category = attributes.get('Statute_CrimeCategory') or attributes.get('Crime_Type', 'Unknown Crime')
+                address = attributes.get('Geocode_Address') or attributes.get('Location', 'Unknown Location')
+                recent_crimes.append({'category': category, 'address': address, 'date': crime_date})
+                
+    recent_crimes.sort(key=lambda x: x['date'], reverse=True)
+    print(f"\n--- CRIMES REPORTED IN PAST 7 DAYS ({len(recent_crimes)}) ---")
+    print("=" * 60)
+    for count, crime in enumerate(recent_crimes[:25], 1):
+        formatted_date = crime['date'].strftime("%Y-%m-%d %I:%M %p")
+        print(f"{count}. {crime['category']}\n   Date:  {formatted_date}\n   Block: {crime['address']}\n" + "-" * 60)
+
+# ==========================================
+# 3. ECONOMIC GROWTH TRACKER
+# ==========================================
+def fetch_new_businesses():
+    url = "https://data.ny.gov/resource/n9v6-gdp6.json"
+    querystring = {
+        "$where": "upper(county) = 'MONROE'", 
+        "$order": "initial_dos_filing_date DESC",
+        "$limit": 25 
+    }
+    print("\n[System] Connecting to NYS Corporate Database...")
+    response = requests.get(url, params=querystring)
+    return response.json() if response.status_code == 200 else None
+
+def display_new_businesses(data):
+    if not data: return
+    print(f"\n--- NEW BUSINESS REGISTRATIONS ({len(data)}) ---")
+    print("=" * 60)
+    for count, business in enumerate(data, 1):
+        name = business.get('current_entity_name', 'UNKNOWN NAME').title()
+        entity_type = business.get('entity_type', 'Unknown Type')
+        city = business.get('dos_process_city', 'Unknown City').title()
+        raw_date = business.get('initial_dos_filing_date')
+        
+        formatted_date = datetime.strptime(raw_date.split('T')[0], "%Y-%m-%d").strftime("%B %d, %Y") if raw_date else "Unknown Date"
+        print(f"{count}. {name}\n   Type: {entity_type}\n   City: {city}\n   Date: {formatted_date}\n" + "-" * 60)
+
+# ==========================================
+# 4. INFRASTRUCTURE TRACKER
+# ==========================================
+def fetch_active_construction():
+    url = "https://data.ny.gov/resource/ekci-x6aq.json"
+    querystring = {
+        "$where": "upper(county) = 'MONROE'", 
+        "$order": "project_budget DESC",
+        "$limit": 15
+    }
+    print("\n[System] Connecting to DASNY Construction Database...")
+    response = requests.get(url, params=querystring)
+    return response.json() if response.status_code == 200 else None
+
+def display_construction_projects(data):
+    if not data: return
+    print(f"\n--- ACTIVE MAJOR CONSTRUCTION PROJECTS ({len(data)}) ---")
+    print("=" * 60)
+    for count, project in enumerate(data, 1):
+        institution = project.get('institution', 'Unknown Institution').title()
+        description = project.get('description', 'No description provided.')
+        raw_budget = project.get('project_budget', 0)
+        
+        try:
+            formatted_budget = f"${float(raw_budget):,.2f}"
+        except ValueError:
+            formatted_budget = "Budget Not Disclosed"
+            
+        start = project.get('construction_start_date', 'Unknown').split('T')[0]
+        end = project.get('construction_completion_date', 'Unknown').split('T')[0]
+        print(f"{count}. {institution}\n   Project: {description}\n   Budget:  {formatted_budget}\n   Timeline:{start} to {end}\n" + "-" * 60)
+
+# ==========================================
+# 5. LOCAL VENDOR FESTIVALS
+# ==========================================
+def get_upcoming_festivals():
+    festivals_2026 = [
+        {"name": "Rochester International Jazz Festival", "dates": "June 19 - June 27, 2026", "location": "Downtown Rochester", "url": "rochesterjazz.com"},
+        {"name": "Corn Hill Arts Festival", "dates": "July 11 - 12, 2026", "location": "Corn Hill Neighborhood", "url": "cornhillartsfestival.com"},
+        {"name": "Rochester Fringe Festival", "dates": "September 2026 (Dates TBA)", "location": "Downtown Rochester", "url": "rochesterfringe.com"}
+    ]
+
+    print("\n--- UPCOMING VENDOR FESTIVALS (2026) ---")
+    print("=" * 60)
+    for count, event in enumerate(festivals_2026, 1):
+        print(f"{count}. {event['name']}\n   Dates: {event['dates']}\n   Location: {event['location']}\n   Web: {event['url']}\n" + "-" * 60)
+
+# ==========================================
+# MASTER DASHBOARD INTERFACE
+# ==========================================
+def main_menu():
+    api_key = None  # Store the API key in memory so you don't have to type it twice
+    
+    while True:
+        print("\n" + "="*60)
+        print(" 🏙️  ROCHESTER NEIGHBORHOOD INTELLIGENCE SUITE")
+        print("="*60)
+        print("1. Real Estate Market (Recently Sold)")
+        print("2. Public Safety (7-Day Crime Log)")
+        print("3. Economic Growth (New Businesses)")
+        print("4. Infrastructure (Major Construction)")
+        print("5. Local Events (Vendor Festivals)")
+        print("6. RUN ALL REPORTS")
+        print("7. Exit")
+        print("="*60)
+        
+        choice = input("Select a dashboard feed (1-7): ")
+        
+        if choice == '1' or choice == '6':
+            if not api_key:
+                api_key = input("\nEnter your RapidAPI Key for Zillow: ")
+            display_sold_homes(fetch_sold_homes(api_key))
+            
+        if choice == '2' or choice == '6':
+            display_recent_crimes(fetch_rochester_crime_data())
+            
+        if choice == '3' or choice == '6':
+            display_new_businesses(fetch_new_businesses())
+            
+        if choice == '4' or choice == '6':
+            display_construction_projects(fetch_active_construction())
+            
+        if choice == '5' or choice == '6':
+            get_upcoming_festivals()
+            
+        if choice == '7':
+            print("\nExiting Intelligence Suite. Have a great day!\n")
+            break
+            
+        if choice not in ['1','2','3','4','5','6','7']:
+            print("\n❌ Invalid selection. Please type a number from 1 to 7.")
+
+if __name__ == "__main__":
+    main_menu()
