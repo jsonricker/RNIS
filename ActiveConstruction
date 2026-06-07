@@ -1,0 +1,59 @@
+import requests
+
+def fetch_active_construction():
+    # The official Socrata Open Data endpoint for NYS Active Construction Projects
+    url = "https://data.ny.gov/resource/ekci-x6aq.json"
+    
+    querystring = {
+        # Using the same bulletproof case-insensitive filter for Monroe County
+        "$where": "upper(county) = 'MONROE'", 
+        # Sort by the most expensive, massive projects first
+        "$order": "project_budget DESC",
+        "$limit": 25
+    }
+
+    print("Connecting to the NYS Construction Open Data portal...")
+    # No API keys required!
+    response = requests.get(url, params=querystring)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"❌ Error connecting to NYS server: {response.status_code}")
+        return None
+
+def display_construction_projects(data):
+    if not data:
+        print("No active construction data found for this region.")
+        return
+
+    print(f"\n✅ Successfully pulled {len(data)} active major construction projects in Monroe County.")
+    print("\n--- ACTIVE CAPITAL CONSTRUCTION PROJECTS ---")
+    print("=" * 70)
+    
+    for count, project in enumerate(data, 1):
+        # Extracting the project details safely
+        institution = project.get('institution', 'Unknown Institution').title()
+        description = project.get('description', 'No description provided.')
+        
+        # Format the budget into a clean currency string
+        raw_budget = project.get('project_budget', 0)
+        try:
+            formatted_budget = f"${float(raw_budget):,.2f}"
+        except ValueError:
+            formatted_budget = "Budget Not Disclosed"
+            
+        # Get start and estimated completion dates
+        start_date = project.get('construction_start_date', 'Unknown Start').split('T')[0]
+        end_date = project.get('construction_completion_date', 'Unknown Completion').split('T')[0]
+        
+        print(f"{count}. {institution}")
+        print(f"   Project: {description}")
+        print(f"   Budget:  {formatted_budget}")
+        print(f"   Timeline:{start_date} to {end_date}")
+        print("-" * 70)
+
+# --- Execution ---
+if __name__ == "__main__":
+    construction_data = fetch_active_construction()
+    display_construction_projects(construction_data)
