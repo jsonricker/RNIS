@@ -1,0 +1,89 @@
+import requests
+from datetime import datetime, timedelta
+
+def fetch_rochester_crime_data():
+    # This is the official public ArcGIS API endpoint for RPD's "Last 30 Days" crime layer
+    url = "https://maps.cityofrochester.gov/arcgis/rest/services/RPD/RPD_Part_I_Crime/FeatureServer/1/query"
+    
+    # ArcGIS APIs require specific query parameters to return JSON
+    querystring = {
+        "where": "1=1",
+        # FIX: Only download these 3 specific columns, ignore the other 50+ backend columns
+        "outFields": "Statute_CrimeCategory,Geocode_Address,Reported_Timestamp", 
+        "returnGeometry": "false",
+        "orderByFields": "Reported_Timestamp DESC", # Ask the server to sort newest-first
+        "resultRecordCount": "500",                 # Cap it at 500 records
+        "f": "json"
+    }
+    
+    print("Connecting to the Rochester Police Open Data API...")
+    response = requests.get(url, params=querystring)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"❌ Error connecting to RPD server: {response.status_code}")
+        return None
+
+def display_recent_crimes(data):
+    if not data or 'features' not in data:
+        print("No crime data found in the response.")
+        return
+
+    # ArcGIS puts all the actual data records inside a list called 'features'
+    crimes = data['features']
+    print(f"✅ Successfully downloaded {len(crimes)} crime records from the 30-day database.")
+    
+    # Calculate the exact timestamp for 7 days ago
+    one_week_ago = datetime.now() - timedelta(days=7)
+    recent_crimes = []
+    
+    for crime in crimes:
+        # The specific details of the crime are stored in an 'attributes' dictionary
+        attributes = crime.get('attributes', {})
+        
+        # ArcGIS stores dates as Unix timestamps in milliseconds
+        # We check both common timestamp names used by RPD
+        timestamp_ms = attributes.get('Reported_Timestamp') or attributes.get('OccurredFrom_Timestamp')
+        
+        if timestamp_ms:
+            # Convert the milliseconds into a standard Python datetime object
+            crime_date = datetime.fromtimestamp(timestamp_ms / 1000.0)
+            
+            # Filter: Only keep it if it happened within the last 7 days
+            if crime_date >= one_week_ago:
+                
+                # RPD categorizes their data using these specific keys
+                category = attributes.get('Statute_CrimeCategory') or attributes.get('Crime_Type', 'Unknown Crime')
+                address = attributes.get('Geocode_Address') or attributes.get('Location', 'Unknown Location')
+                
+                recent_crimes.append({
+                    'category': category,
+                    'address': address,
+                    'date': crime_date
+                })
+                
+    print(f"\n--- CRIMES REPORTED IN THE PAST 7 DAYS: {len(recent_crimes)} ---")
+    print("=" * 50)
+    
+    # Sort the list so the most recent crimes show up first
+    recent_crimes.sort(key=lambda x: x['date'], reverse=True)
+    
+    # Print the results (limiting to the top 25 so it doesn't flood your terminal)
+    for count, crime in enumerate(recent_crimes[:25], 1):
+        # Format the date to look like "2024-10-25 03:45 PM"
+        formatted_date = crime['date'].strftime("%Y-%m-%d %I:%M %p")
+        
+        print(f"{count}. Crime: {crime['category']}")
+        print(f"   Date:  {formatted_date}")
+        print(f"   Block: {crime['address']}")
+        print("-" * 50)
+        
+    if len(recent_crimes) > 25:
+        print(f"...and {len(recent_crimes) - 25} more unlisted.")
+
+# --- Execution ---
+if __name__ == "__main__":
+    # No API key required! Just run it.
+    raw_data = fetch_rochester_crime_data()
+    display_recent_crimes(raw_data)
