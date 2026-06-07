@@ -1,0 +1,67 @@
+import requests
+
+def fetch_sold_homes(api_key, location="Rochester, NY"):
+    # This is your confirmed working endpoint for sold data
+    url = "https://real-estate-zillow-com.p.rapidapi.com/v1/search/sold" 
+    
+    # Configuration parameters for your search
+    querystring = {
+        "location_or_rid": location,
+        "property_types": "house",
+        "sort": "relevant", 
+        "page": "1",
+        "doz": "7"          
+    }
+
+    headers = {
+        "X-RapidAPI-Key": api_key,
+        "X-RapidAPI-Host": "real-estate-zillow-com.p.rapidapi.com"
+    }
+
+    print(f"Connecting to API to fetch recently sold homes in {location}...")
+    response = requests.get(url, headers=headers, params=querystring)
+
+    if response.status_code == 200:
+        return response.json()
+    elif response.status_code == 403:
+        print("❌ Error 403: Forbidden. Please check your RapidAPI subscription.")
+        return None
+    else:
+        print(f"❌ Error: Server returned status code {response.status_code}")
+        return None
+
+def display_sold_homes(data):
+    if not data:
+        print("No data available to display.")
+        return
+
+    # Dig into data -> listings based on your diagnostic printout
+    property_list = []
+    if isinstance(data, dict):
+        if 'data' in data and isinstance(data['data'], dict):
+            property_list = data['data'].get('listings', [])
+    
+    if not property_list:
+        print("Successfully connected, but the 'listings' folder was empty or missing.")
+        return
+
+    print(f"\nFound {len(property_list)} recently sold homes:")
+    print("=" * 50)
+    
+    for count, property in enumerate(property_list, 1):
+        address = property.get('address', 'No Address Listed')
+        zpid = property.get('zpid') or property.get('id')
+        link = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else "No Link"
+        
+        # Output layout with price completely removed
+        print(f"{count}. Address: {address}")
+        print(f"   Zillow Link: {link}")
+        print("-" * 50)
+
+# --- Execution ---
+if __name__ == "__main__":
+    # Replace this with your newly generated, secure RapidAPI key
+    API_KEY = "9e8ea8d28amsh2532f14d3732d9dp14e473jsnc5c526595e64" 
+    
+    raw_data = fetch_sold_homes(API_KEY, location="Rochester, NY")
+    display_sold_homes(raw_data)
